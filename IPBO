@@ -1,0 +1,98 @@
+# Improved Polar Bear Optimization
+
+# update the leader's location corresponding to the local search
+def local_search(x_best,V,N):
+    angles = np.random.rand(N) * 2 * np.pi
+    sta = np.random.random() * V
+    angle0 = np.random.random() * np.pi / 2
+    r = 0.25 * sta * np.cos(angle0)* np.sin(angle0) 
+    
+    result = np.cumsum(np.sin(angles))
+    
+    ori = Func(x_best.reshape(1,-1))
+    eta = np.random.rand()
+    
+    temp = r*result
+    temp_add = x_best + temp
+    temp_minus = x_best - temp
+    x0 = temp_add if Func(temp_add.reshape(1,-1))< Func(temp_minus.reshape(1,-1)) else temp_minus
+    if Func(x0.reshape(1,-1))<ori:
+        x1 = x0 + eta*np.sign(x0-x_best)
+    else:
+        x1 = x0 - eta*np.sign(x0-x_best)
+    return x1
+
+'''Boundary check function'''
+def BorderCheck(X,limit,m,dim):
+    B = np.random.rand(m,dim) * (limit[1] - limit[0]) + limit[0]
+    boundary = np.random.logical_and(X[:m,:] <= limit[1],X[:m,:] >= limit[0])
+    X[:m] = np.where(boundary,X[:m],B)
+    return X
+
+def initial(M,N,m,limit):
+    X = np.zeros((M,N))
+    X[:m] = np.random.random((m, N)) * (limit[1] - limit[0]) + limit[0]
+    return X
+# dynamic control the birth or death
+def dinmaic_update(X,m,M,N,K):
+    k = np.random.random()
+    # reprodunction
+    if m < M - 1 and k > (1 - K):
+        X[m] = np.mean(X[:4],axis=0)   
+        m += 1
+    # Death of the weakest individual
+    if m > M * 0.5 and k < K:
+        X[m-1] = np.zeros(N)
+        m -= 1
+    return m,X
+# update the location of the producers 
+def PDUpdate(X,PDNumber,Max_iter,M, N):
+    for p in range(1,PDNumber): 
+        a = np.random.random((N))
+        X[p,:] = X[p,:]*np.exp(-p/(a*Max_iter))     
+    return X
+# update of the followers
+def follower_update(x_best,X,PDNumber,m,t,T):
+    eta = np.random.rand(m-PDNumber).reshape(-1,1)
+    X[PDNumber:m,:] += eta*np.sign(x_best-X[PDNumber:m,:])
+    return X
+
+def ipbo(Func,M, N, T, V, P, K, B):
+
+    m = int(M*P)
+    PDNumber = int(m*0.4)
+    
+    fits = np.zeros(M)
+    f_best = np.inf
+    x_best = 0
+    res = []
+    
+    X = initial(M,N,m,B)
+    fits[:m] = Func(X[:m,:])
+    arg = np.argsort(fits[:m])
+    X[:m] = X[arg]
+    if fits[arg[0]] < f_best:
+        f_best = fits[arg[0]]
+        x_best = X[0]
+    t = 0
+    
+    while t < T:
+        
+        X[0] = local_search(x_best,V,N)
+        X = PDUpdate(X,PDNumber,T,M,N)
+        X = follower_update(x_best,X,PDNumber,m,t,T)
+        X = BorderCheck(X,B,m,N)
+        fits[:m] = Func(X[:m])
+        arg = np.argsort(fits[:m])
+        X[:m] = X[arg]
+        
+        if fits[arg[0]] < f_best:
+            f_best = fits[arg[0]]
+            x_best = X[0]
+            
+        m,X = dinmaic_update(X,m,M,N,K,x_best,arg,V)
+        
+        t += 1
+        res.append(f_best)
+        
+    return res

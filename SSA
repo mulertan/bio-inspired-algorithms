@@ -1,0 +1,90 @@
+# For Sparrow Search Algorithm
+
+
+''' Tent population initialisation function '''
+def initial(pop, dim, ub, lb):
+    X = np.random.rand(pop, dim) * (ub - lb) + lb
+    return X
+
+def BorderCheck(X,pop,dim,ub,lb):
+    B = np.random.rand(pop,dim) * (ub - lb) + lb
+    X = np.where(X <= ub,X,B)
+    X = np.where(X >= lb,X,B)
+    return X
+
+def PDUpdate(X, PDNumber, ST, Max_iter, dim):
+    R2 = np.random.random()
+    if R2<ST:
+        for p in range(PDNumber):
+            a = np.random.random((dim))
+            X[p,:] = X[p,:]*np.exp(-p/(a*Max_iter))
+    else:
+        X[:PDNumber,:] +=  np.random.randn(PDNumber,dim)
+                
+    return X
+           
+def JDUpdate(X, PDNumber, pop, dim):
+    # 产生-1，1的随机数
+    A = np.ones(dim)
+    A = np.where(np.random.random(dim)>0.5,A,np.ones(dim)*(-1))
+    
+    for i in range(PDNumber + 1, pop):
+        if i > (pop - PDNumber) / 2 + PDNumber:
+            X[i,:] = np.random.randn(dim) * np.exp((X[-1,:] - X[i,:]) / i ** 2)
+        else:
+            AA = np.mean(np.abs(X[i,:] - X[0,:])*A)
+            X[i,:] = X[0,:] - AA
+            
+    return X
+   
+def SDUpdate(X,dim,pop, SDNumber, fitness, BestF):
+    Temp = range(pop)
+    RandIndex = random.sample(Temp, pop)
+    SDchooseIndex = RandIndex[0:SDNumber]
+    for i in SDchooseIndex:
+        if fitness[i] > BestF:
+            X[i,:] = X[0,:] + np.random.randn(dim) * np.abs(X[i,:] - X[0,:])
+        elif fitness[i] == BestF:
+            K = 2 * np.random.random(dim) - 1
+            X[i,:] = X[i,:] + K * (
+                    np.abs(X[i,:] - X[-1,:]) / (fitness[i] - fitness[-1] + 10E-8))
+    return X     
+
+pop = 100
+dim = 400
+lb = -10   #32
+ub = 10   #32
+Max_iter = 100
+
+
+def Tent_SSA(pop,dim,lb,ub,Max_iter,fun):
+    ST = 0.6 # threshhold value for warning
+    PD = 0.7 # The ratio of discoverers, the remaining ones are joiners
+    SD = 0.2 # ratio of sparrows aware of danger
+    PDNumber = int(pop*PD) 
+    SDNumber = int(pop*SD) 
+    X = initial(pop, dim, ub, lb) 
+    fitness = fun(X) 
+    sortIndex = np.argsort(fitness) 
+    fitness = fitness[sortIndex]
+    X = X[sortIndex]
+    GbestScore = fitness[0]
+    GbestPositon = X[0,:]
+    Curve = np.zeros(Max_iter)
+
+    for i in range(Max_iter):
+
+        BestF = fitness[0]
+        X = PDUpdate(X,PDNumber,ST,Max_iter,dim)   
+        X = JDUpdate(X,PDNumber,pop,dim)           
+        X = SDUpdate(X,dim,pop,SDNumber,fitness,BestF) 
+        X = BorderCheck(X,pop,dim,ub,lb) 
+        fitness = fun(X) 
+        sortIndex = np.argsort(fitness) 
+        fitness = fitness[sortIndex]
+        X = X[sortIndex] 
+        if(fitness[0]<=GbestScore): 
+            GbestScore = fitness[0]
+            GbestPositon = X[0,:]
+        Curve[i] = GbestScore
+    return Curve,GbestScore

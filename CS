@@ -1,0 +1,96 @@
+def BorderCheck(X,Np,dim,x_max,x_min):
+    B = np.random.rand(Np,dim) * (x_max - x_min) + x_min
+    temp =np.logical_and(X <= x_max,X >= x_min)
+    X = np.where(temp,X,B)
+    return X
+    
+def cuckoo_search(pop, dim, func, lower, upper, max_iter = 100,pa = 0.25, beta = 1.5, step_size = 0.1):
+    """
+        pop : Number of nests
+        dim: Number of dimensions
+        func: User defined fitness evaluative function
+        lower: Lower bounary
+        upper: Upper boundary
+        max_iter: Number of iterations 
+        pa: Possibility that hosts find cuckoos' eggs (default: 0.25)
+        beta: Power law index
+        step_size:  Step size scaling factor related to the problem's scale (default: 0.1)
+    """
+    # get initial nests' locations 
+    nests = generate_nests(pop, dim, lower, upper)
+    fitness = func(nests)
+
+    # get the best nest and record it
+    index = np.argmin(fitness)
+    best_fitness = fitness[index]
+    best_nest = nests[index]
+    res = []  #
+
+    for _ in range(max_iter):
+        nests = update_nests(func, lower, upper, nests, best_nest, fitness, step_size)
+        nests = abandon_nests(nests, lower, upper, pa)
+        fitness = func(nests)
+        
+        index = np.argmin(fitness)
+        min_fitness = fitness[index]
+        min_nest = nests[index]
+
+        if (min_fitness < best_fitness):
+            best_nest = min_nest
+            best_fitness = min_fitness
+        res.append(best_fitness)
+
+    return np.array(res)
+
+def generate_nests(pop, dim, lower, upper):
+   
+    return np.random.uniform(lower,upper,(pop,dim))
+
+
+def update_nests(func, lower, upper, nests, best_nest, fitness, step_coefficient):
+    
+    pop, dim = nests.shape
+    # generate steps using levy flight
+    steps = levy_flight(pop, dim, 1.5)
+    new_nests = nests.copy()
+    
+    step_size = step_coefficient * steps * (nests - best_nest)
+    step_direction = np.random.rand(pop,dim)
+    new_nests += step_size * step_direction
+    new_nests = BorderCheck(new_nests,pop,dim,upper,lower)
+
+    new_fitness = func(new_nests)
+    nests[new_fitness < fitness] = new_nests[new_fitness < fitness]
+    
+    return nests
+
+def abandon_nests(nests, lower, upper, pa): 
+    pop, dim = nests.shape
+    for each_nest in range(pop):
+        if (np.random.rand() < pa):
+            step_size = np.random.rand() * (nests[np.random.randint(0,pop)] - nests[np.random.randint(0,pop)])
+            nests[each_nest] += step_size
+    nests = BorderCheck(nests,pop,dim,upper,lower)
+    
+    return nests
+
+def levy_flight(pop, dim, beta):
+    """
+    This function implements Levy's flight.
+    ---------------------------------------------------
+    Input parameters:
+        n: Number of steps 
+        m: Number of dimensions
+        beta: Power law index (note: 1 < beta < 2)
+    Output:
+        'n' levy steps in 'm' dimension
+    """
+    sigma_u = (sc_special.gamma(1+beta)*np.sin(np.pi*beta/2)/(sc_special.gamma((1+beta)/2)*beta*(2**((beta-1)/2))))**(1/beta)
+    sigma_v = 1
+
+    u =  np.random.normal(0, sigma_u, (pop, dim))
+    v = np.random.normal(0, sigma_v, (pop, dim))
+
+    steps = u/((np.abs(v))**(1/beta))
+
+    return steps

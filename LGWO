@@ -1,0 +1,81 @@
+def levyarray(Np,dim,beta=1.5,alpha=0.01):
+    sigma_u=((math.gamma(1+beta)*math.sin(np.pi*beta/2))/(math.gamma((1+beta)/2)*beta*2**(0.5*(beta-1))))**(1/beta)
+    u=np.random.normal(0,sigma_u,(Np,dim))
+    v=np.random.normal(0,1,(Np,dim))
+    alpha_levi=alpha*u/(np.power(np.abs(v),1/beta))
+    return alpha_levi
+                        
+def initial(Np,dim,x_max,x_min): 
+    X = np.random.uniform(x_min,x_max,(Np, dim))
+    return X
+                        
+def BorderCheck(X,Np,dim,x_max,x_min):
+    B = np.random.rand(Np,dim) * (x_max - x_min) + x_min
+    temp =np.logical_and(X <= x_max,X >= x_min)
+    X = np.where(temp,X,B)
+    return X
+
+'''嵌入莱维飞行的灰狼优化算法'''
+def LGWO(NP,dim,NG,x_max,x_min,amax=2):
+ 
+    '''
+    :param NP:种群规模
+    :param dim: 数据维度
+    :param NG: 最大迭代步数
+    :param amax: 系数向量初始值
+    :param x_max: 解允许的最大值
+    :param x_min: 解允许的最小值
+    :return: 最优解和最优解的目标函数值
+    '''
+ 
+    '''随机产生初始解'''
+    X = initial(Np,dim,x_max,x_min)
+    values = function(X)
+    arg_index = np.argsort(values)
+    value_best = values[arg_index[0]]
+    
+    Xalpha=X[arg_index[0]]
+    Xbeta=X[arg_index[1]]
+    res = []
+    
+    for i in range(NG):
+        a=amax*(1-i/NG)
+        r1=np.random.rand(Np,dim)
+        r2=np.random.rand(Np,dim)
+        
+        A1=2*a*r1-a
+        C1=2*r2
+        D_alpha=np.abs(C1*Xalpha-X)
+ 
+        r1=np.random.rand(Np,dim)
+        r2=np.random.rand(Np,dim)
+        A2=2*a*r1-a
+        C2=2*r2
+        D_beta=np.abs(C2*Xbeta-X)
+ 
+        X_old=X.copy()
+        A=np.random.rand(Np,dim)
+        dist = 0.5*(Xalpha-A1*D_alpha+Xbeta-A2*D_beta)
+        alpha_levy = levyarray(Np,dim)
+        X_old = np.where(A<0.5,dist,alpha_levy+dist)
+       
+        '''贪婪选择算法'''
+        for j in range(Np):
+            rnew=np.random.rand()
+            p=np.random.rand()
+            if function(X[j].reshape(1,-1))>function(X_old[j].reshape(1,-1)) and (rnew<p):
+                X[j] =X_old[j]
+        
+        X = BorderCheck(X,Np,dim,x_max,x_min)
+        values = function(X)
+        arg_index = np.argsort(values)
+        
+        Xalpha= X[arg_index[0]]
+        Xbeta=X[arg_index[1]]
+        
+
+        if value_best > values[arg_index[0]]:
+            value_best = values[arg_index[0]]
+        res.append(value_best)
+    
+    return res

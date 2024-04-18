@@ -1,0 +1,63 @@
+# For Diferrential Evolution algorithm
+def mutate(population,N,F):
+    individual = np.random.choice(range(0,N),(N,3))
+    H = population[individual[:,0],:] + F * (population[individual[:,1],:] - population[individual[:,2],:])
+    return H
+                                                                                    
+#交叉操作
+def crossover(population,H,cr):
+    
+    temp = np.random.uniform(0,1,(N,dim))  
+    u = np.where(temp<cr,population,H)                                                                              
+    
+    return u
+
+#选择操作
+def selection(population,V):
+    newpopulation = np.zeros(population.shape)
+    pfit = fitness(population)   
+    vfit = fitness(V)  
+    for i in range(len(pfit)):
+        if pfit[i] < vfit[i]:
+            newpopulation [i] = population[i] 
+        else:
+            newpopulation [i] = V[i] 
+    return newpopulation
+
+def de_algorithm(N,dim,T,l,r,F1,cr=0.5):
+    #主程序
+    population = initial(N,dim,l,r)
+    max_iter = T
+    f_best = []
+    Gbest=float('inf')
+    Gbest_pos=[0 for i in range(dim)]
+    
+    while T>0:
+        F = F1
+        lamda = np.exp(1-max_iter/(1+T))
+        F = F*np.power(2,lamda)
+        #变异操作
+        H = mutate(population,N,F)
+        #交叉操作
+        V = crossover(population,H,cr)
+        #选择操作
+        newpopulation=selection(population,V)
+        
+        fits = fitness(newpopulation)
+        sm = fits.min()
+        if sm< Gbest:
+            Gbest=sm
+            arg = np.argmin(fits)
+            Gbest_pos=newpopulation[arg]
+        #选择最优
+#         for i in range(N):
+#             fit=fitness(newpopulation[i])
+#             #如果该位置小于全局最优 则更新全局最优的值和位置
+#             if fit<Gbest:
+#                 Gbest=fit
+#                 Gbest_pos=newpopulation[i].copy()
+        #赋值是为了后面还要继续对新产生的种群进行变异、交叉、选择
+        f_best.append(Gbest)
+        population=newpopulation
+        T-=1
+    return f_best

@@ -1,0 +1,107 @@
+# for Polar Bear Optimization
+import numpy as np
+import random
+
+#Parameters set
+'''M: maximum size of population
+   N: the number of dimension
+   T: maximum number of iterations
+   V: maximum field of view
+   P:percentage of initialized population size
+   K:dynamic adjustment of scale threshold
+   B: boundary values of variables
+'''
+M, N, T, V, P, K, B = 100, 200, 100, 0.3, 0.75, 0.25, [-32,32]
+def local_move(x_best,x,V,N):
+    angles = np.random.random(N) * 2 * np.pi
+    sta = np.random.random() * V
+    angle0 = np.random.random() * np.pi / 2
+    r = 0.25 * sta * np.cos(angle0) * np.sin(angle0)
+    
+    result = np.cumsum(np.sin(angles))
+    result2 = np.cos(angles)
+    
+    ori = Func(x)
+    temp = r*(result + result2)
+    temp_add = x_best + temp
+    if Func(temp_add)<ori:
+        x= temp_add
+    else:
+        temp_minus = x_best - temp
+        if Func(temp_minus)<ori:
+            x = temp_minus
+
+    return x
+
+def global_move(x_best,x,Func):
+    w = np.sqrt(np.sum((x_best - x) ** 2))
+    alpha = np.random.random()
+    gamma = np.random.random() * w
+    tmp = x + alpha + gamma
+    if Func(tmp) < Func(x):
+        x = tmp
+    return x
+
+def BorderCheck(X,limit,m,dim):
+    B = np.random.rand(m,dim) * (limit[1] - limit[0]) + limit[0]
+    boundary_logic = np.random.logical_and(X[:m,:] <= limit[1],X[:m,:] >= limit[0])
+    X[:m,:] = np.where(boundary_logical,X[:m,:],B)
+    return X
+
+def initial(M,N,m,limit):
+    X = np.zeros((M,N))
+    X[:m] = np.random.random((m, N)) * (limit[1] - limit[0]) + limit[0]
+    return X
+
+# dynamic control of the population size
+def dinmaic_update(X,m,M,N,K,x_best,arg):
+    k = np.random.random()
+    # reproduction
+    if m < M - 1 and k > (1 - K):
+        idx = np.random.randint(1, np.floor(m * 0.1) + 1)
+        X[m] = (x_best + X[arg[idx]]) / 2
+        m += 1
+    # starvation
+    if m > M * 0.5 and k < K:
+        X[m] = np.zeros(N)
+        m -= 1
+    return m,X
+
+def pbo_algorithm(M,N,P,V,T,K,B,Func,limit):
+    
+    m = int(np.floor(M * P))
+    fits = np.zeros(M)
+    X = initial(M,N,m,limit)
+    f_best = np.inf
+    x_best = 0
+    
+    for i in range(m):
+        fits[i] = Func(X[i])
+
+    arg = np.argsort(fits[:m])
+
+    if fits[arg[0]] < f_best:
+        f_best = fits[arg[0]]
+        x_best = X[arg[0]]
+    t = 0
+    res = []
+
+    while t < T:
+        # area search
+        for i in range(m):
+            X[i] = local_move(x_best,X[i],V,N)
+            X[i] = global_move(x_best,X[i],Func)
+        X = BorderCheck(X,limit,m,N)
+        for i in range(m):
+            fits[i] = Func(X[i])
+        arg = np.argsort(fits[:m])
+
+        if fits[arg[0]] < f_best:
+            f_best = fits[arg[0]]
+            x_best = X[arg[0]]
+            
+        X[:m] = X[arg]
+        m,X = dinmaic_update(X,m,M,N,K,x_best,arg)
+        t += 1
+        res.append(f_best)
+    return res
